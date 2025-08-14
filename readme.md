@@ -6,8 +6,6 @@ Quick and dirty length matching heads-up display for KiCad
 
 Designed to assist with length-matching tracks in a parallel bus, this tool connects to a running KiCad interface and calculates the lengths of a set of nets, as well as comparing them to the length of a reference net.
 
-This is just a quick demo of how it could work.
-
 Features:
 * Real-time update, refreshes every 3 seconds
 * Hovering over a net in the tool highlights it in KiCad
