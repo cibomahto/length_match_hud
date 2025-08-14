@@ -1,0 +1,52 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+}
+
+.top-span {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: white;
+    display: block;
+}
+
+.sticky-form {
+    background: #fff;
+    margin-bottom: 20px;
+    padding: 10px 0;
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    row-gap: 1em;
+    column-gap: 1em;
+}
+
+.sticky-table-header {
+    position: sticky;
+    top: 175px;
+    background: #fff;
+    z-index: 2;
+}
+
+
+header {
+    font-size: 2em;
+    margin-bottom: 20px;
+    padding: 0;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+th,
+td {
+    border: 1px solid #ccc;
+    padding: 10px;
+    text-align: left;
+}
+
+th {
+    background-color: #f2f2f2;
+}

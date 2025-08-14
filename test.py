@@ -1,5 +1,6 @@
 from kipy import KiCad
 from kipy import util
+
 import kipy.errors
 import time
 
@@ -15,14 +16,22 @@ class context:
             self.board = kicad.get_board()
         else:
             self.board = board
+    
+    def get_nets(self):
+        nets = []
+
+        for net in self.board.get_nets():
+            nets.append(net.name)
+        
+        return nets
 
     def net_lengths(self, filter):
         nets = {}
 
         for net in self.board.get_nets():
-            if net.name.startswith(filter):
+            #if net.name.startswith(filter):
+            if net.name.find(filter) != -1:
                 nets[net.name] = {'length':0, 'via_count':0}
-                # netclass = self.board.get_netclass_for_nets(net)[net.name]
 
         # Sum lengths of all tracks, in all layers. Note that this includes any stubs
         # TODO: Sum lengths separately for each layer

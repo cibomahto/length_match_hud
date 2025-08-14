@@ -16,6 +16,14 @@ def get_lengths():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/get_nets", methods=["GET"])
+def get_nets():
+    try:
+        nets = ctx.get_nets()
+        return jsonify(nets), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/select_net", methods=["PUT"])
 def select_net():
     try:
