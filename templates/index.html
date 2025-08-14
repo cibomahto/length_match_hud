@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Landing Page</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        header { font-size: 2em; margin-bottom: 20px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <header>
+        KiCad Length Matching Tool
+    </header>
+    <form id="filter-form" style="margin-bottom: 20px;">
+        <label for="filter">Net name filter:</label>
+        <input type="text" id="filter" name="filter" value="/iMX6 DDR RAM/DRAM" style="width: 400px;">
+        <br>
+        <label for="reference_net">Reference net:</label>
+        <input type="text" id="reference_net" name="reference_net" value="/iMX6 DDR RAM/DRAM_SDCLK0_P" style="width: 400px;">
+        <br>
+        <label for="max_tolerance">Max length tolerance (mm):</label>
+        <input type="number" id="max_tolerance" name="max_tolerance" value="2" step="0.1" style="width: 100px;">
+        <button type="submit">Apply</button>
+    </form>
+    <table id="data-table">
+        <thead>
+            <tr>
+                <th>Net</th>
+                <th>Length (mm)</th>
+                <th>Difference (mm)</th>
+                <th>Via Count</th>
+            </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+            {% for row in table_data %}
+            <tr>
+                <td>{{ row.col1 }}</td>
+                <td>{{ row.col2 }}</td>
+                <td>{{ row.col3 }}</td>
+                <td>{{ row.col4 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <script>
+        async function updateTable(filter = '') {
+            try {
+                let url = '/net_lengths';
+                if (filter) {
+                    url += '?filter=' + encodeURIComponent(filter);
+                }
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+                const tbody = document.getElementById('table-body');
+
+                const referenceNet = document.getElementById('reference_net').value;
+                const referenceLength = data[referenceNet] ? data[referenceNet].length : null;
+
+                // Assume data is an object where each key is the track name and value is { length, via }
+                let rows = '';
+                Object.entries(data).forEach(([key, value]) => {
+                    rows += `<tr>
+                        <td>${key}</td>
+                        <td>${value.length.toFixed(2)}</td>
+                        <td style="${referenceLength !== null && Math.abs(value.length - referenceLength) > parseFloat(document.getElementById('max_tolerance').value) ? 'background-color: #f99;' : ''}">
+                            ${referenceLength !== null ? (value.length - referenceLength).toFixed(2) : ''}
+                        </td>
+                        <td>${value.via_count}</td>
+                    </tr>`;
+                });
+                tbody.innerHTML = rows;
+            } catch (error) {
+                console.error('Error fetching table data:', error);
+            }
+        }
+        function addRowHoverListeners() {
+            const tbody = document.getElementById('table-body');
+            // Remove previous listeners by cloning
+            const newTbody = tbody.cloneNode(true);
+            tbody.parentNode.replaceChild(newTbody, tbody);
+
+            newTbody.addEventListener('mouseover', async function (e) {
+            let tr = e.target.closest('tr');
+            if (!tr || !newTbody.contains(tr)) return;
+            // Highlight row
+            tr.style.backgroundColor = '#cce4ff';
+            const netName = tr.cells[0]?.textContent;
+            if (netName) {
+                try {
+                await fetch('/select_net', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ net: netName })
+                });
+                } catch (err) {
+                console.error('Error calling /select:', err);
+                }
+            }
+            });
+
+            newTbody.addEventListener('mouseout', function (e) {
+            let tr = e.target.closest('tr');
+            if (!tr || !newTbody.contains(tr)) return;
+            // Remove highlight
+            tr.style.backgroundColor = '';
+            });
+        }
+
+        // Re-add listeners after table update
+        const originalUpdateTable = updateTable;
+        updateTable = async function (...args) {
+            await originalUpdateTable.apply(this, args);
+            addRowHoverListeners();
+        };
+
+        // Update table on page load
+        window.onload = () => {
+            const filterInput = document.getElementById('filter');
+            updateTable(filterInput.value);
+
+            // Run updateTable every 5 seconds
+            clearInterval(window.updateTableInterval);
+            window.updateTableInterval = setInterval(() => {
+                const filterValue = document.getElementById('filter').value;
+                updateTable(filterValue);
+            }, 2000);
+        };
+        // Handle filter form submission
+        document.getElementById('filter-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const filterValue = document.getElementById('filter').value;
+            updateTable(filterValue);
+        });
+    </script>
+</body>
+</html>
