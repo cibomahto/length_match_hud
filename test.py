@@ -28,8 +28,26 @@ class context:
         
         return nets
 
+    def get_thru_via_thickness(self):
+        # Note: we get a different result from KiCad because we include the top and bottom copper thickness. It's an approximation either way.
+        thickness = 0
+
+        with self.board_lock:
+            stackup = self.board.get_stackup()
+            for layer in stackup.layers:
+                #print(layer)
+                if layer.type == 1 or layer.type == 2:
+                    #print(f"Layer {layer.layer} thickness: {util.units.to_mm(layer.thickness)} mm")
+
+                    thickness += util.units.to_mm(layer.thickness)
+
+
+        return thickness
+
     def net_lengths(self, filter):
         nets = {}
+
+        thru_via_thickness = self.get_thru_via_thickness()
 
         with self.board_lock:
             for net in self.board.get_nets():
@@ -49,6 +67,9 @@ class context:
             for via in self.board.get_vias():
                 if via.net.name in nets:
                     net = nets[via.net.name]
+
+                    # TODO: assumes a thru-via. If you have a stub then that's worse?
+                    net['length'] += thru_via_thickness
 
                     net['via_count'] += 1
 

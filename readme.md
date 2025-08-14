@@ -13,11 +13,11 @@ Features:
 * Hovering over a net in the tool highlights it in KiCad
 
 TODO:
-* Add via lengths to the count
-* Seperate track lengths per layer
+* Separate track lengths per layer
 * Calculate matches in terms of delay instead of length, per layer
 * Support additional per-pin delays (from part packaging)
 * Allow grouping by net class, reference length targets per net class
+* Support blind/buried vias
 
 Usage instructions:
 1. Clone this repo
