@@ -2,6 +2,8 @@ function loadIndexPage() {
     // Sorting state
     let sortColumn = 'name'; // 'name' or 'diff'
     let sortDirection = 1;   // 1 for ascending, -1 for descending
+    
+    let selectedNet = null;  // Local variable to store the selected net
 
     async function updateTable(filter = '') {
         try {
@@ -136,7 +138,8 @@ function loadIndexPage() {
             // Highlight row
             tr.style.backgroundColor = '#cce4ff';
             const netName = tr.cells[0]?.textContent;
-            if (netName) {
+            if (netName && selectedNet !== netName) {
+                selectedNet = netName; // Save selected net locally
                 try {
                     await fetch('/select_net', {
                         method: 'PUT',
@@ -154,8 +157,10 @@ function loadIndexPage() {
             if (!tr || !newTbody.contains(tr)) return;
             // Remove highlight
             tr.style.backgroundColor = '';
+            selectedNet = null; // Clear selected net on deselection
         });
     }
+
 
     async function populateReferenceNetSelect() {
         try {

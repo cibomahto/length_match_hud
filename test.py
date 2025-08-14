@@ -51,19 +51,22 @@ class context:
         return nets
 
     def select_net(self, net):
-        self.board.clear_selection()
+        items = []
 
         for track in self.board.get_tracks():
             if track.net.name == net:
-                self.board.add_to_selection(track)
+                items.append(track)
 
         for via in self.board.get_vias():
             if via.net.name == net:
-                self.board.add_to_selection(via)
+                items.append(via)
 
         for pad in self.board.get_pads():
             if pad.net.name == net:
-                self.board.add_to_selection(pad)
+                items.append(pad)
+
+        self.board.clear_selection()
+        self.board.add_to_selection(items)
 
 if __name__=='__main__':
     ctx = context()
