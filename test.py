@@ -1,8 +1,8 @@
 from kipy import KiCad
 from kipy import util
-
 import kipy.errors
 import time
+from threading import Lock
 
 class context:
     def __init__(self, board = None):
@@ -16,57 +16,62 @@ class context:
             self.board = kicad.get_board()
         else:
             self.board = board
+        
+        self.board_lock = Lock()
     
     def get_nets(self):
         nets = []
 
-        for net in self.board.get_nets():
-            nets.append(net.name)
+        with self.board_lock:
+            for net in self.board.get_nets():
+                nets.append(net.name)
         
         return nets
 
     def net_lengths(self, filter):
         nets = {}
 
-        for net in self.board.get_nets():
-            #if net.name.startswith(filter):
-            if net.name.find(filter) != -1:
-                nets[net.name] = {'length':0, 'via_count':0}
+        with self.board_lock:
+            for net in self.board.get_nets():
+                #if net.name.startswith(filter):
+                if net.name.find(filter) != -1:
+                    nets[net.name] = {'length':0, 'via_count':0}
 
-        # Sum lengths of all tracks, in all layers. Note that this includes any stubs
-        # TODO: Sum lengths separately for each layer
-        for track in self.board.get_tracks():
-            if track.net.name in nets:
-                net = nets[track.net.name]
+            # Sum lengths of all tracks, in all layers. Note that this includes any stubs
+            # TODO: Sum lengths separately for each layer
+            for track in self.board.get_tracks():
+                if track.net.name in nets:
+                    net = nets[track.net.name]
 
-                #print(track.net, track.length())
-                net['length'] += util.units.to_mm(track.length())
+                    #print(track.net, track.length())
+                    net['length'] += util.units.to_mm(track.length())
 
-        for via in self.board.get_vias():
-            if via.net.name in nets:
-                net = nets[via.net.name]
+            for via in self.board.get_vias():
+                if via.net.name in nets:
+                    net = nets[via.net.name]
 
-                net['via_count'] += 1
+                    net['via_count'] += 1
 
         return nets
 
     def select_net(self, net):
         items = []
 
-        for track in self.board.get_tracks():
-            if track.net.name == net:
-                items.append(track)
+        with self.board_lock:
+            for track in self.board.get_tracks():
+                if track.net.name == net:
+                    items.append(track)
 
-        for via in self.board.get_vias():
-            if via.net.name == net:
-                items.append(via)
+            for via in self.board.get_vias():
+                if via.net.name == net:
+                    items.append(via)
 
-        for pad in self.board.get_pads():
-            if pad.net.name == net:
-                items.append(pad)
+            for pad in self.board.get_pads():
+                if pad.net.name == net:
+                    items.append(pad)
 
-        self.board.clear_selection()
-        self.board.add_to_selection(items)
+            self.board.clear_selection()
+            self.board.add_to_selection(items)
 
 if __name__=='__main__':
     ctx = context()

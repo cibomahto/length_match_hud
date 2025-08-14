@@ -1,12 +1,16 @@
 function loadIndexPage() {
     // Sorting state
-    let sortColumn = 'name'; // 'name' or 'diff'
+    let sortColumn = 'name';
     let sortDirection = 1;   // 1 for ascending, -1 for descending
     
     let selectedNet = null;  // Local variable to store the selected net
 
-    async function updateTable(filter = '') {
+    async function updateTable() {
         try {
+            clearInterval(window.updateTableInterval);
+
+            const filter = document.getElementById('filter').value;
+
             let url = '/net_lengths';
             if (filter) {
                 url += '?filter=' + encodeURIComponent(filter);
@@ -68,11 +72,89 @@ function loadIndexPage() {
             tbody.innerHTML = rows;
         } catch (error) {
             console.error('Error fetching table data:', error);
+        } finally {
+            window.updateTableInterval = setInterval(() => {
+                updateTable();
+            }, 2000);
         }
     }
 
-    // Add sorting to table headers
-    window.addEventListener('DOMContentLoaded', () => {
+    function addRowHoverListeners() {
+        const tbody = document.getElementById('table-body');
+        // Remove previous listeners by cloning
+        const newTbody = tbody.cloneNode(true);
+        tbody.parentNode.replaceChild(newTbody, tbody);
+
+        let isFetching = false;
+
+        newTbody.addEventListener('mouseover', async function (e) {
+            let tr = e.target.closest('tr');
+            if (!tr || !newTbody.contains(tr)) return;
+            // Highlight row
+            tr.style.backgroundColor = '#cce4ff';
+            const netName = tr.cells[0]?.textContent;
+            if (netName && selectedNet !== netName && !isFetching) {
+                selectedNet = netName; // Save selected net locally
+                isFetching = true;
+                try {
+                    await fetch('/select_net', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ net: netName })
+                    });
+                } catch (err) {
+                    console.error('Error calling /select:', err);
+                } finally {
+                    isFetching = false;
+                }
+            }
+        });
+
+        newTbody.addEventListener('mouseout', function (e) {
+            let tr = e.target.closest('tr');
+            if (!tr || !newTbody.contains(tr)) return;
+            // Remove highlight
+            tr.style.backgroundColor = '';
+            selectedNet = null; // Clear selected net on deselection
+        });
+    }
+
+    // Re-add listeners after table update
+    const originalUpdateTable = updateTable;
+    updateTable = async function (...args) {
+        await originalUpdateTable.apply(this, args);
+        addRowHoverListeners();
+    };
+
+    async function populateReferenceNetSelect() {
+        try {
+            const response = await fetch('/get_nets');
+            if (!response.ok) throw new Error('Failed to fetch nets');
+            const nets = await response.json(); // nets is now a list
+            const select = document.getElementById('reference_net');
+            select.innerHTML = '';
+            nets.forEach(net => {
+                const option = document.createElement('option');
+                option.value = net;
+                option.textContent = net;
+                select.appendChild(option);
+            });
+
+            const savedReferenceNet = localStorage.getItem('referenceNet');
+            if (savedReferenceNet !== null) {
+                document.getElementById('reference_net').value = savedReferenceNet;
+            }
+            // const targetNet = '/iMX6 DDR RAM/DRAM_SDCLK0_P';
+            // const targetOption = Array.from(select.options).find(opt => opt.value === targetNet);
+            // if (targetOption) {
+            //     select.value = targetNet;
+            // }
+        } catch (error) {
+            console.error('Error populating reference net select:', error);
+        }
+    }
+
+    function addSortingListeners() {
         const nameHeader = document.getElementById('th-name');
         const lengthHeader = document.getElementById('th-length');
         const diffHeader = document.getElementById('th-diff');
@@ -91,7 +173,7 @@ function loadIndexPage() {
                     sortColumn = 'name';
                     sortDirection = 1;
                 }
-                updateTable(document.getElementById('filter').value);
+                updateTable();
             });
 
             lengthHeader.addEventListener('click', () => {
@@ -101,7 +183,7 @@ function loadIndexPage() {
                     sortColumn = 'length';
                     sortDirection = 1;
                 }
-                updateTable(document.getElementById('filter').value);
+                updateTable();
             });
 
             diffHeader.addEventListener('click', () => {
@@ -111,7 +193,7 @@ function loadIndexPage() {
                     sortColumn = 'diff';
                     sortDirection = 1;
                 }
-                updateTable(document.getElementById('filter').value);
+                updateTable();
             });
 
             viaHeader.addEventListener('click', () => {
@@ -121,98 +203,51 @@ function loadIndexPage() {
                     sortColumn = 'via_count';
                     sortDirection = 1;
                 }
-                updateTable(document.getElementById('filter').value);
+                updateTable();
             });
-        }
-    });
-
-    function addRowHoverListeners() {
-        const tbody = document.getElementById('table-body');
-        // Remove previous listeners by cloning
-        const newTbody = tbody.cloneNode(true);
-        tbody.parentNode.replaceChild(newTbody, tbody);
-
-        newTbody.addEventListener('mouseover', async function (e) {
-            let tr = e.target.closest('tr');
-            if (!tr || !newTbody.contains(tr)) return;
-            // Highlight row
-            tr.style.backgroundColor = '#cce4ff';
-            const netName = tr.cells[0]?.textContent;
-            if (netName && selectedNet !== netName) {
-                selectedNet = netName; // Save selected net locally
-                try {
-                    await fetch('/select_net', {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ net: netName })
-                    });
-                } catch (err) {
-                    console.error('Error calling /select:', err);
-                }
-            }
-        });
-
-        newTbody.addEventListener('mouseout', function (e) {
-            let tr = e.target.closest('tr');
-            if (!tr || !newTbody.contains(tr)) return;
-            // Remove highlight
-            tr.style.backgroundColor = '';
-            selectedNet = null; // Clear selected net on deselection
-        });
-    }
-
-
-    async function populateReferenceNetSelect() {
-        try {
-            const response = await fetch('/get_nets');
-            if (!response.ok) throw new Error('Failed to fetch nets');
-            const nets = await response.json(); // nets is now a list
-            const select = document.getElementById('reference_net');
-            select.innerHTML = '';
-            nets.forEach(net => {
-                const option = document.createElement('option');
-                option.value = net;
-                option.textContent = net;
-                select.appendChild(option);
-            });
-
-            const targetNet = '/iMX6 DDR RAM/DRAM_SDCLK0_P';
-            const targetOption = Array.from(select.options).find(opt => opt.value === targetNet);
-            if (targetOption) {
-                select.value = targetNet;
-            }
-        } catch (error) {
-            console.error('Error populating reference net select:', error);
         }
     }
 
-    // Re-add listeners after table update
-    const originalUpdateTable = updateTable;
-    updateTable = async function (...args) {
-        await originalUpdateTable.apply(this, args);
-        addRowHoverListeners();
-    };
+    function addFormListeners() {
+        document.getElementById('filter-form').addEventListener('submit', function (e) {
+            e.preventDefault();
+            updateTable();
+        });
 
-    // Update table on page load
-    window.onload = () => {
-        const filterInput = document.getElementById('filter');
-        updateTable(filterInput.value);
-
-        // Run updateTable every 5 seconds
-        clearInterval(window.updateTableInterval);
-        window.updateTableInterval = setInterval(() => {
+        document.getElementById('filter').addEventListener('input', function () {
             const filterValue = document.getElementById('filter').value;
-            updateTable(filterValue);
-        }, 2000);
+            localStorage.setItem('filterValue', filterValue);
+            updateTable();
+        });
+
+        document.getElementById('reference_net').addEventListener('change', function () {
+            const referenceNet = document.getElementById('reference_net').value;
+            localStorage.setItem('referenceNet', referenceNet);
+            updateTable();
+        });
+
+        document.getElementById('max_tolerance').addEventListener('input', function () {
+            const maxTolerance = document.getElementById('max_tolerance').value;
+            localStorage.setItem('maxTolerance', maxTolerance);
+            updateTable();
+        });
+    }
+
+    window.addEventListener('DOMContentLoaded', function () {
+        const savedFilter = localStorage.getItem('filterValue');
+        if (savedFilter !== null) {
+            document.getElementById('filter').value = savedFilter;
+        }
+
+        const savedMaxTolerance = localStorage.getItem('maxTolerance');
+        if (savedMaxTolerance !== null) {
+            document.getElementById('max_tolerance').value = savedMaxTolerance;
+        }
+
+        addSortingListeners();
+        addFormListeners();
 
         populateReferenceNetSelect();
-    };
-
-    // Handle filter form submission
-    document.getElementById('filter-form').addEventListener('submit', function (e) {
-        e.preventDefault();
-        const filterValue = document.getElementById('filter').value;
-        updateTable(filterValue);
+        updateTable();
     });
-
 }
