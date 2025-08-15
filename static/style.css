@@ -3,15 +3,7 @@ body {
     margin: 20px;
 }
 
-.top-span {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    background: white;
-    display: block;
-}
-
-.sticky-form {
+.hud-form {
     background: #fff;
     margin-bottom: 20px;
     padding: 10px 0;
@@ -21,18 +13,17 @@ body {
     column-gap: 1em;
 }
 
-.sticky-table-header {
-    position: sticky;
-    top: 175px;
-    background: #fff;
-    z-index: 2;
-}
-
-
 header {
     font-size: 2em;
     margin-bottom: 20px;
     padding: 0;
+}
+
+.sticky-table-header {
+    top: 0;
+    z-index: 2;
+    position: sticky;
+    background-color: #f2f2f2;
 }
 
 table {
@@ -45,8 +36,4 @@ td {
     border: 1px solid #ccc;
     padding: 10px;
     text-align: left;
-}
-
-th {
-    background-color: #f2f2f2;
 }

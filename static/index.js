@@ -4,6 +4,7 @@ function loadIndexPage() {
     let sortDirection = 1;   // 1 for ascending, -1 for descending
     
     let selectedNet = null;  // Local variable to store the selected net
+    let remoteSelectedNet = null;  // Local variable to store the selected net
 
     async function updateTable() {
         try {
@@ -60,7 +61,13 @@ function loadIndexPage() {
                 if (row.diff !== null && Math.abs(row.diff) > maxTolerance) {
                     diffBg = row.diff > 0 ? 'color: #d32f2f;' : 'color: orange;';
                 }
-                rows += `<tr>
+                let rowBg = '';
+                if (row.name === selectedNet) {
+                    rowBg = 'background-color: #cce4ff;';
+                } else if (row.name === remoteSelectedNet) {
+                    rowBg = 'background-color: #ffe082;';
+                }
+                rows += `<tr style="${rowBg}">
                     <td>${row.name}</td>
                     <td>${row.length.toFixed(2)}</td>
                     <td style="${diffBg}">
@@ -94,7 +101,8 @@ function loadIndexPage() {
             tr.style.backgroundColor = '#cce4ff';
             const netName = tr.cells[0]?.textContent;
             if (netName && selectedNet !== netName && !isFetching) {
-                selectedNet = netName; // Save selected net locally
+                selectedNet = netName;
+                remoteSelectedNet = null;
                 isFetching = true;
                 try {
                     await fetch('/select_net', {
@@ -119,11 +127,47 @@ function loadIndexPage() {
         });
     }
 
+    async function checkRemoteSelectedNet() {
+        if (selectedNet === null) {
+            try {
+                const response = await fetch('/selected_net');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.selected_net) {
+                        const lastRemoteSelectedNet = remoteSelectedNet;
+                        remoteSelectedNet = data.selected_net;
+                        console.log(remoteSelectedNet);
+                        const tbody = document.getElementById('table-body');
+                        Array.from(tbody.rows).forEach(row => {
+                            if (row.cells[0]?.textContent === remoteSelectedNet) {
+                                row.style.backgroundColor = '#ffe082';
+                                row.scrollIntoView({behavior: "smooth", block: "center", inline: "start",container:"nearest"});
+                            } else {
+                                row.style.backgroundColor = '';
+                            }
+                        });
+                    }
+                    else {
+                        remoteSelectedNet = null;
+                        const tbody = document.getElementById('table-body');
+                        Array.from(tbody.rows).forEach(row => {
+                            row.style.backgroundColor = '';
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching selected net:', error);
+            }
+        }
+    }
+    
     // Re-add listeners after table update
     const originalUpdateTable = updateTable;
     updateTable = async function (...args) {
         await originalUpdateTable.apply(this, args);
         addRowHoverListeners();
+
+        checkRemoteSelectedNet();
     };
 
     async function populateReferenceNetSelect() {
@@ -209,7 +253,7 @@ function loadIndexPage() {
     }
 
     function addFormListeners() {
-        document.getElementById('filter-form').addEventListener('submit', function (e) {
+        document.getElementById('hud-form').addEventListener('submit', function (e) {
             e.preventDefault();
             updateTable();
         });

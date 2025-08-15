@@ -74,6 +74,15 @@ class context:
                     net['via_count'] += 1
 
         return nets
+    
+    def get_selected_net(self):
+        # Just return the first selected net
+        with self.board_lock:
+            for selected in self.board.get_selection():
+                if hasattr(selected,'net'):
+                    return selected.net.name
+        
+        return None
 
     def select_net(self, net):
         items = []
@@ -96,6 +105,10 @@ class context:
 
 if __name__=='__main__':
     ctx = context()
+
+    print(ctx.get_selected_net())
+
+    exit(1)
 
     ctx.select_net("/iMX6 DDR RAM/DRAM_DATA13")
 

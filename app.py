@@ -24,6 +24,14 @@ def get_nets():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/selected_net", methods=["GET"])
+def get_selected_net():
+    try:
+        selected_net = ctx.get_selected_net()
+        return jsonify({"selected_net": selected_net}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/select_net", methods=["PUT"])
 def select_net():
     try:

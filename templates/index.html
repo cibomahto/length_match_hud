@@ -9,12 +9,13 @@
 </head>
 
 <body>
-    <span class="top-span">
-        <header>
+    <div style="display: flex; flex-direction: column; height: 95vh;">
+        <div style="flex: 0 0 auto; height: auto; overflow: visible;">
+            <header>
             KiCad Length Matching HUD
-        </header>
+            </header>
 
-        <form id="filter-form" class="sticky-form">
+            <form id="hud-form" class="hud-form">
             <label for="filter">Net name filter:</label>
             <input type="text" id="filter" name="filter" style="width: 400px;">
 
@@ -23,20 +24,23 @@
 
             <label for="max_tolerance">Max length tolerance (mm):</label>
             <input type="number" id="max_tolerance" name="max_tolerance" step="0.1" style="width: 100px;">
-        </form>
-    </span>
-    <table id="data-table">
-        <thead class="sticky-table-header">
-            <tr>
-                <th id="th-name">Net</th>
-                <th id="th-length">Length (mm)</th>
-                <th id="th-diff">Difference (mm)</th>
-                <th id="th-via">Via Count</th>
-            </tr>
-        </thead>
-        <tbody id="table-body">
-        </tbody>
-    </table>
+            </form>
+        </div>
+        <div style="flex: 1 1 0; overflow: scroll;">
+            <table id="data-table">
+                <thead class="sticky-table-header">
+                    <tr>
+                        <th id="th-name">Net</th>
+                        <th id="th-length">Length (mm)</th>
+                        <th id="th-diff">Difference (mm)</th>
+                        <th id="th-via">Via Count</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                </tbody>
+            </table>
+        </div>
+    </div>
     <script>
         loadIndexPage();
     </script>
