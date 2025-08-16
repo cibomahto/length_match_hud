@@ -2,9 +2,9 @@ function loadIndexPage() {
     // Sorting state
     let sortColumn = 'name';
     let sortDirection = 1;   // 1 for ascending, -1 for descending
-    
+
     let selectedNet = null;  // Local variable to store the selected net
-    let remoteSelectedNet = null;  // Local variable to store the selected net
+    let remoteSelectedNets = [];  // Local variable to store the selected net
 
     async function updateTable() {
         try {
@@ -19,6 +19,13 @@ function loadIndexPage() {
             const response = await fetch(url);
             if (!response.ok) throw new Error('Network response was not ok');
             const data = await response.json();
+
+
+            const selectedNetsResponse = await fetch('/selected_nets');
+            if (!selectedNetsResponse.ok) throw new Error('Failed to fetch selected nets');
+            const selectedNetsData = await selectedNetsResponse.json();
+            remoteSelectedNets = selectedNetsData.selected_nets;
+
             const tbody = document.getElementById('table-body');
 
             const referenceNet = document.getElementById('reference_net').value;
@@ -62,9 +69,11 @@ function loadIndexPage() {
                     diffBg = row.diff > 0 ? 'color: #d32f2f;' : 'color: orange;';
                 }
                 let rowBg = '';
-                if (row.name === selectedNet) {
-                    rowBg = 'background-color: #cce4ff;';
-                } else if (row.name === remoteSelectedNet) {
+                // if (row.name === selectedNet) {
+                //     rowBg = 'background-color: #cce4ff;';
+                // }
+                // else 
+                if (selectedNet == null && remoteSelectedNets.includes(row.name)) {
                     rowBg = 'background-color: #ffe082;';
                 }
                 rows += `<tr style="${rowBg}">
@@ -78,7 +87,7 @@ function loadIndexPage() {
             });
             tbody.innerHTML = rows;
         } catch (error) {
-            console.error('Error fetching table data:', error);
+            console.error('Error updating table:', error.message);
         } finally {
             window.updateTableInterval = setInterval(() => {
                 updateTable();
@@ -93,27 +102,41 @@ function loadIndexPage() {
         tbody.parentNode.replaceChild(newTbody, tbody);
 
         let isFetching = false;
+        let pendingNetName = null;
 
-        newTbody.addEventListener('mouseover', async function (e) {
+        async function sendFetch(netName) {
+            isFetching = true;
+            try {
+                await fetch('/selected_nets', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nets: [netName] })
+                });
+            } catch (err) {
+                console.error('Error calling /select:', err);
+            } finally {
+                isFetching = false;
+                if (pendingNetName !== null && pendingNetName !== netName) {
+                    const nextNet = pendingNetName;
+                    pendingNetName = null;
+                    selectedNet = nextNet;
+                    sendFetch(nextNet);
+                }
+            }
+        }
+
+        newTbody.addEventListener('mouseover', function (e) {
             let tr = e.target.closest('tr');
             if (!tr || !newTbody.contains(tr)) return;
             // Highlight row
             tr.style.backgroundColor = '#cce4ff';
             const netName = tr.cells[0]?.textContent;
-            if (netName && selectedNet !== netName && !isFetching) {
-                selectedNet = netName;
-                remoteSelectedNet = null;
-                isFetching = true;
-                try {
-                    await fetch('/select_net', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ net: netName })
-                    });
-                } catch (err) {
-                    console.error('Error calling /select:', err);
-                } finally {
-                    isFetching = false;
+            if (netName && selectedNet !== netName) {
+                if (isFetching) {
+                    pendingNetName = netName;
+                } else {
+                    selectedNet = netName;
+                    sendFetch(netName);
                 }
             }
         });
@@ -127,47 +150,11 @@ function loadIndexPage() {
         });
     }
 
-    async function checkRemoteSelectedNet() {
-        if (selectedNet === null) {
-            try {
-                const response = await fetch('/selected_net');
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data && data.selected_net) {
-                        const lastRemoteSelectedNet = remoteSelectedNet;
-                        remoteSelectedNet = data.selected_net;
-                        console.log(remoteSelectedNet);
-                        const tbody = document.getElementById('table-body');
-                        Array.from(tbody.rows).forEach(row => {
-                            if (row.cells[0]?.textContent === remoteSelectedNet) {
-                                row.style.backgroundColor = '#ffe082';
-                                row.scrollIntoView({behavior: "smooth", block: "center", inline: "start",container:"nearest"});
-                            } else {
-                                row.style.backgroundColor = '';
-                            }
-                        });
-                    }
-                    else {
-                        remoteSelectedNet = null;
-                        const tbody = document.getElementById('table-body');
-                        Array.from(tbody.rows).forEach(row => {
-                            row.style.backgroundColor = '';
-                        });
-                    }
-                }
-            } catch (error) {
-                console.error('Error fetching selected net:', error);
-            }
-        }
-    }
-    
     // Re-add listeners after table update
     const originalUpdateTable = updateTable;
     updateTable = async function (...args) {
         await originalUpdateTable.apply(this, args);
         addRowHoverListeners();
-
-        checkRemoteSelectedNet();
     };
 
     async function populateReferenceNetSelect() {
@@ -252,6 +239,55 @@ function loadIndexPage() {
         }
     }
 
+    async function selectNoncompliantNets() {
+        try {
+            const filter = document.getElementById('filter').value;
+            let url = '/net_lengths';
+            if (filter) {
+                url += '?filter=' + encodeURIComponent(filter);
+            }
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Network response was not ok');
+            const data = await response.json();
+
+            const referenceNet = document.getElementById('reference_net').value;
+            const referenceLength = data[referenceNet] ? data[referenceNet].length : null;
+            const maxTolerance = parseFloat(document.getElementById('max_tolerance').value);
+
+            const noncompliantNets = Object.entries(data)
+                .filter(([key, value]) => {
+                    if (referenceLength === null) return false;
+                    const diff = value.length - referenceLength;
+                    return Math.abs(diff) > maxTolerance;
+                })
+                .map(([key]) => key);
+
+            if (noncompliantNets.length > 0) {
+                await fetch('/selected_nets', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nets: noncompliantNets })
+                });
+            }
+        } catch (error) {
+            console.error('Error selecting noncompliant nets:', error);
+        }
+    }
+
+    async function deselectAllNets() {
+        try {
+            await fetch('/selected_nets', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nets: [] })
+            });
+            selectedNet = null;
+            updateTable();
+        } catch (error) {
+            console.error('Error deselecting all nets:', error);
+        }
+    }
+
     function addFormListeners() {
         document.getElementById('hud-form').addEventListener('submit', function (e) {
             e.preventDefault();
@@ -290,6 +326,9 @@ function loadIndexPage() {
 
         addSortingListeners();
         addFormListeners();
+
+        document.getElementById('select-noncompliant').addEventListener('click', selectNoncompliantNets);
+        document.getElementById('clear-selection').addEventListener('click', deselectAllNets);
 
         populateReferenceNetSelect();
         updateTable();

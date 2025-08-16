@@ -24,21 +24,19 @@ def get_nets():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/selected_net", methods=["GET"])
+@app.route("/selected_nets", methods=["GET"])
 def get_selected_net():
     try:
-        selected_net = ctx.get_selected_net()
-        return jsonify({"selected_net": selected_net}), 200
+        selected_nets = ctx.get_selected_nets()
+        return jsonify({"selected_nets": selected_nets}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/select_net", methods=["PUT"])
+@app.route("/selected_nets", methods=["PUT"])
 def select_net():
     try:
-        net = request.json.get("net")
-        if not net:
-            return jsonify({"error": "Missing 'net' parameter"}), 400
-        result = ctx.select_net(net)
+        nets = request.json.get("nets")
+        result = ctx.select_nets(nets)
         return jsonify({"result": result}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500

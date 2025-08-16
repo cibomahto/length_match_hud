@@ -75,29 +75,31 @@ class context:
 
         return nets
     
-    def get_selected_net(self):
+    def get_selected_nets(self):
         # Just return the first selected net
         with self.board_lock:
+            nets = []
             for selected in self.board.get_selection():
                 if hasattr(selected,'net'):
-                    return selected.net.name
-        
-        return None
+                    if not selected.net.name in nets:
+                        nets.append(selected.net.name)
 
-    def select_net(self, net):
+        return nets
+
+    def select_nets(self, nets):
         items = []
 
         with self.board_lock:
             for track in self.board.get_tracks():
-                if track.net.name == net:
+                if track.net.name in nets:
                     items.append(track)
 
             for via in self.board.get_vias():
-                if via.net.name == net:
+                if via.net.name in nets:
                     items.append(via)
 
             for pad in self.board.get_pads():
-                if pad.net.name == net:
+                if pad.net.name in nets:
                     items.append(pad)
 
             self.board.clear_selection()
@@ -105,10 +107,6 @@ class context:
 
 if __name__=='__main__':
     ctx = context()
-
-    print(ctx.get_selected_net())
-
-    exit(1)
 
     ctx.select_net("/iMX6 DDR RAM/DRAM_DATA13")
 

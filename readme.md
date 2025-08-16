@@ -9,6 +9,7 @@ Designed to assist with length-matching tracks in a parallel bus, this tool conn
 Features:
 * Real-time update, refreshes every 2 seconds
 * Hovering over a net in the tool highlights it in KiCad
+* Selecting a net in KiCad shows its length in this tool
 
 TODO:
 * Separate track lengths per layer
