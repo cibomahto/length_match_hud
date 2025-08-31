@@ -1,3 +1,4 @@
+from turtle import delay
 from kipy import KiCad
 from kipy import util
 import kipy.errors
@@ -35,7 +36,6 @@ class context:
         with self.board_lock:
             stackup = self.board.get_stackup()
             for layer in stackup.layers:
-                #print(layer)
                 if layer.type == 1 or layer.type == 2:
                     #print(f"Layer {layer.layer} thickness: {util.units.to_mm(layer.thickness)} mm")
 
@@ -46,32 +46,28 @@ class context:
 
     def net_lengths(self, filter):
         nets = {}
-
-        thru_via_thickness = self.get_thru_via_thickness()
-
+        
         with self.board_lock:
             for net in self.board.get_nets():
-                #if net.name.startswith(filter):
                 if net.name.find(filter) != -1:
-                    nets[net.name] = {'length':0, 'via_count':0}
+                    nets[net.name] = {
+                        'layer_lengths': {},
+                        'vias': 0
+                    }
 
             # Sum lengths of all tracks, in all layers. Note that this includes any stubs
             # TODO: Sum lengths separately for each layer
             for track in self.board.get_tracks():
                 if track.net.name in nets:
                     net = nets[track.net.name]
-
-                    #print(track.net, track.length())
-                    net['length'] += util.units.to_mm(track.length())
+                    track_length_mm = util.units.to_mm(track.length())
+                    net['layer_lengths'][track.layer] = net['layer_lengths'].get(track.layer, 0) + track_length_mm
 
             for via in self.board.get_vias():
                 if via.net.name in nets:
                     net = nets[via.net.name]
 
-                    # TODO: assumes a thru-via. If you have a stub then that's worse?
-                    net['length'] += thru_via_thickness
-
-                    net['via_count'] += 1
+                    net['vias'] += 1
 
         return nets
     

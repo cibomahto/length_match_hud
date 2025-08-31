@@ -6,20 +6,66 @@ function loadIndexPage() {
     let selectedNet = null;  // Local variable to store the selected net
     let remoteSelectedNets = [];  // Local variable to store the selected net
 
+    // TODO: Make this editable
+    const active_copper_layers = {
+        3: { 'name': 'top', 'delay': 5.8 },
+        5: { 'name': 'in2', 'delay': 7.2 },
+        10: { 'name': 'in7', 'delay': 7.2 },
+        34: { 'name': 'bottom', 'delay': 5.8 }
+    };
+
+    const via_delay = 7.2 * 1.6048;  //TODO
+
+    async function fetchAndBuildRowsArr(filter) {
+        let url = '/net_lengths';
+        if (filter) {
+            url += '?filter=' + encodeURIComponent(filter);
+        }
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Network response was not ok');
+        const data = await response.json();
+
+        // Convert data to array for sorting
+        return Object.entries(data).map(([key, value]) => {
+            let totalLayerDelay = 0;
+            const layerLengths = {};
+            for (const [layerNum, layerInfo] of Object.entries(active_copper_layers)) {
+                const layerName = layerInfo.name;
+                layerLengths[layerName] = value.layer_lengths?.[layerNum] ?? 0;
+                totalLayerDelay += (value.layer_lengths?.[layerNum] ?? 0) * layerInfo.delay;
+            }
+
+            return {
+                name: key,
+                delay: totalLayerDelay + value.vias * via_delay,
+                top: layerLengths.top,
+                in2: layerLengths.in2,
+                in7: layerLengths.in7,
+                bottom: layerLengths.bottom,
+                vias: value.vias
+            };
+        });
+    }
+
+    // Calculate the delay difference vs the reference net
+    function calculateDiffs(rowsArr) {
+        const referenceNet = document.getElementById('reference_net').value;
+        const referenceRow = rowsArr.find(row => row.name === referenceNet);
+        const referenceDelay = referenceRow ? referenceRow.delay : 0;
+        rowsArr.forEach(row => {
+            row.diff = row.delay - referenceDelay;
+        });
+    }
+
     async function updateTable() {
         try {
             clearInterval(window.updateTableInterval);
 
             const filter = document.getElementById('filter').value;
+            let rowsArr = await fetchAndBuildRowsArr(filter);
+            calculateDiffs(rowsArr);
 
-            let url = '/net_lengths';
-            if (filter) {
-                url += '?filter=' + encodeURIComponent(filter);
-            }
-            const response = await fetch(url);
-            if (!response.ok) throw new Error('Network response was not ok');
-            const data = await response.json();
-
+            const maxTolerance = parseFloat(document.getElementById('max_tolerance').value);
 
             const selectedNetsResponse = await fetch('/selected_nets');
             if (!selectedNetsResponse.ok) throw new Error('Failed to fetch selected nets');
@@ -28,35 +74,24 @@ function loadIndexPage() {
 
             const tbody = document.getElementById('table-body');
 
-            const referenceNet = document.getElementById('reference_net').value;
-            const referenceLength = data[referenceNet] ? data[referenceNet].length : null;
-
-            const maxTolerance = parseFloat(document.getElementById('max_tolerance').value);
-
-            // Convert data to array for sorting
-            let rowsArr = Object.entries(data).map(([key, value]) => {
-                const diff = referenceLength !== null ? (value.length - referenceLength) : null;
-                return {
-                    name: key,
-                    length: value.length,
-                    diff: diff,
-                    via_count: value.via_count
-                };
-            });
-
             // Sort rows
             rowsArr.sort((a, b) => {
                 if (sortColumn === 'name') {
                     return a.name.localeCompare(b.name) * sortDirection;
+                } else if (sortColumn === 'delay') {
+                    return (a.delay - b.delay) * sortDirection;
                 } else if (sortColumn === 'diff') {
-                    // Place nulls at the end
-                    if (a.diff === null) return 1;
-                    if (b.diff === null) return -1;
                     return (a.diff - b.diff) * sortDirection;
-                } else if (sortColumn === 'length') {
-                    return (a.length - b.length) * sortDirection;
-                } else if (sortColumn === 'via_count') {
-                    return (a.via_count - b.via_count) * sortDirection;
+                } else if (sortColumn === 'top') {
+                    return (a.top - b.top) * sortDirection;
+                } else if (sortColumn === 'in2') {
+                    return (a.in2 - b.in2) * sortDirection;
+                } else if (sortColumn === 'in7') {
+                    return (a.in7 - b.in7) * sortDirection;
+                } else if (sortColumn === 'bottom') {
+                    return (a.bottom - b.bottom) * sortDirection;
+                } else if (sortColumn === 'vias') {
+                    return (a.vias - b.vias) * sortDirection;
                 }
                 return 0;
             });
@@ -68,26 +103,39 @@ function loadIndexPage() {
                 if (row.diff !== null && Math.abs(row.diff) > maxTolerance) {
                     diffBg = row.diff > 0 ? 'color: #d32f2f;' : 'color: orange;';
                 }
+
                 let rowBg = '';
-                // if (row.name === selectedNet) {
-                //     rowBg = 'background-color: #cce4ff;';
-                // }
-                // else 
+
                 if (selectedNet == null && remoteSelectedNets.includes(row.name)) {
                     rowBg = 'background-color: #ffe082;';
                 }
+
                 rows += `<tr style="${rowBg}">
                     <td>${row.name}</td>
-                    <td>${row.length.toFixed(2)}</td>
-                    <td style="${diffBg}">
-                        ${row.diff !== null ? row.diff.toFixed(2) : ''}
-                    </td>
-                    <td>${row.via_count}</td>
+                    <td>${row.delay.toFixed(2)}</td>
+                    <td style="${diffBg}">${row.diff.toFixed(2)}</td>
+                    <td>${row.top.toFixed(2)}</td>
+                    <td>${row.in2.toFixed(2)}</td>
+                    <td>${row.in7.toFixed(2)}</td>
+                    <td>${row.bottom.toFixed(2)}</td>
+                    <td>${row.vias}</td>
                 </tr>`;
             });
             tbody.innerHTML = rows;
+
+            const statusIndicator = document.getElementById('status-indicator');
+            if (statusIndicator) {
+                statusIndicator.style.backgroundColor = 'green';
+                statusIndicator.textContent = 'READY';
+            }
         } catch (error) {
             console.error('Error updating table:', error.message);
+
+            const statusIndicator = document.getElementById('status-indicator');
+            if (statusIndicator) {
+                statusIndicator.style.backgroundColor = 'red';
+                statusIndicator.textContent = 'BUSY';
+            }
         } finally {
             window.updateTableInterval = setInterval(() => {
                 updateTable();
@@ -186,88 +234,61 @@ function loadIndexPage() {
     }
 
     function addSortingListeners() {
-        const nameHeader = document.getElementById('th-name');
-        const lengthHeader = document.getElementById('th-length');
-        const diffHeader = document.getElementById('th-diff');
-        const viaHeader = document.getElementById('th-via');
+        const headerMap = {
+            'th-name': 'name',
+            'th-delay': 'delay',
+            'th-diff': 'diff',
+            'th-top': 'top',
+            'th-in2': 'in2',
+            'th-in7': 'in7',
+            'th-bottom': 'bottom',
+            'th-vias': 'vias'
+        };
 
-        if (nameHeader && lengthHeader && diffHeader && viaHeader) {
-            nameHeader.style.cursor = 'pointer';
-            lengthHeader.style.cursor = 'pointer';
-            diffHeader.style.cursor = 'pointer';
-            viaHeader.style.cursor = 'pointer';
-
-            nameHeader.addEventListener('click', () => {
-                if (sortColumn === 'name') {
-                    sortDirection *= -1;
-                } else {
-                    sortColumn = 'name';
-                    sortDirection = 1;
-                }
-                updateTable();
-            });
-
-            lengthHeader.addEventListener('click', () => {
-                if (sortColumn === 'length') {
-                    sortDirection *= -1;
-                } else {
-                    sortColumn = 'length';
-                    sortDirection = 1;
-                }
-                updateTable();
-            });
-
-            diffHeader.addEventListener('click', () => {
-                if (sortColumn === 'diff') {
-                    sortDirection *= -1;
-                } else {
-                    sortColumn = 'diff';
-                    sortDirection = 1;
-                }
-                updateTable();
-            });
-
-            viaHeader.addEventListener('click', () => {
-                if (sortColumn === 'via_count') {
-                    sortDirection *= -1;
-                } else {
-                    sortColumn = 'via_count';
-                    sortDirection = 1;
-                }
-                updateTable();
-            });
-        }
+        Object.entries(headerMap).forEach(([headerId, columnKey]) => {
+            const header = document.getElementById(headerId);
+            if (header) {
+                header.style.cursor = 'pointer';
+                header.addEventListener('click', () => {
+                    if (sortColumn === columnKey) {
+                        sortDirection *= -1;
+                    } else {
+                        sortColumn = columnKey;
+                        sortDirection = 1;
+                    }
+                    updateTable();
+                });
+            }
+        });
     }
 
     async function selectNoncompliantNets() {
         try {
-            const filter = document.getElementById('filter').value;
-            let url = '/net_lengths';
-            if (filter) {
-                url += '?filter=' + encodeURIComponent(filter);
-            }
-            const response = await fetch(url);
-            if (!response.ok) throw new Error('Network response was not ok');
-            const data = await response.json();
-
-            const referenceNet = document.getElementById('reference_net').value;
-            const referenceLength = data[referenceNet] ? data[referenceNet].length : null;
             const maxTolerance = parseFloat(document.getElementById('max_tolerance').value);
-
-            const noncompliantNets = Object.entries(data)
-                .filter(([key, value]) => {
-                    if (referenceLength === null) return false;
-                    const diff = value.length - referenceLength;
-                    return Math.abs(diff) > maxTolerance;
-                })
-                .map(([key]) => key);
-
+            const tbody = document.getElementById('table-body');
+            const noncompliantNets = [];
+            for (const tr of tbody.rows) {
+                const netName = tr.cells[0]?.textContent;
+                const diff = parseFloat(tr.cells[2]?.textContent);
+                if (!isNaN(diff) && Math.abs(diff) > maxTolerance) {
+                    noncompliantNets.push(netName);
+                }
+            }
             if (noncompliantNets.length > 0) {
                 await fetch('/selected_nets', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ nets: noncompliantNets })
                 });
+                // Highlight the selected rows in the table
+                for (const tr of tbody.rows) {
+                    const netName = tr.cells[0]?.textContent;
+                    if (noncompliantNets.includes(netName)) {
+                        tr.style.backgroundColor = '#ffe082';
+                    } else {
+                        tr.style.backgroundColor = '';
+                    }
+                }
             }
         } catch (error) {
             console.error('Error selecting noncompliant nets:', error);

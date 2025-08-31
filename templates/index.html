@@ -12,7 +12,7 @@
     <div style="display: flex; flex-direction: column; height: 95vh;">
         <div style="flex: 0 0 auto; height: auto; overflow: visible;">
             <header>
-            KiCad Length Matching HUD
+            KiCad Length Matching HUD <span id="status-indicator"></span>
             </header>
 
             <form id="hud-form" class="hud-form">
@@ -22,7 +22,7 @@
             <label for="reference_net">Reference net:</label>
             <select id="reference_net" name="reference_net" style="width: 400px;"></select>
 
-            <label for="max_tolerance">Max length tolerance (mm):</label>
+            <label for="max_tolerance">Max skew (ps):</label>
             <input type="number" id="max_tolerance" name="max_tolerance" step="0.1" style="width: 100px;">
 
             <div style="display: flex; gap: 10px; margin-top: 10px;">
@@ -36,9 +36,13 @@
                 <thead class="sticky-table-header">
                     <tr>
                         <th id="th-name">Net</th>
-                        <th id="th-length">Length (mm)</th>
-                        <th id="th-diff">Difference (mm)</th>
-                        <th id="th-via">Via Count</th>
+                        <th id="th-delay">Delay (ps)</th>
+                        <th id="th-diff">Difference (ps)</th>
+                        <th id="th-top">Top (mm)</th>
+                        <th id="th-in2">In2 (mm)</th>
+                        <th id="th-in7">In7 (mm)</th>
+                        <th id="th-bottom">Bottom (mm)</th>
+                        <th id="th-vias">Vias</th>
                     </tr>
                 </thead>
                 <tbody id="table-body">
