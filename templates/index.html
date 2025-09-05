@@ -19,12 +19,7 @@
             <label for="filter">Net name filter:</label>
             <input type="text" id="filter" name="filter" style="width: 400px;">
 
-            <label for="reference_net">Reference net:</label>
-            <select id="reference_net" name="reference_net" style="width: 400px;"></select>
-
-            <label for="max_tolerance">Max skew (ps):</label>
-            <input type="number" id="max_tolerance" name="max_tolerance" step="0.1" style="width: 100px;">
-
+            
             <div style="display: flex; gap: 10px; margin-top: 10px;">
                 <button type="button" id="select-noncompliant">Select all noncompliant traces</button>
                 <button type="button" id="clear-selection">Clear selection</button>
@@ -37,17 +32,18 @@
                 <button type="button" class="tab-btn active" onclick="showTab('tab-matching')">Length Matching</button>
                 
             </div>
-            <div id="tab-rules" class="tab-content" style="flex: 1 1 0; overflow: auto; padding: 16px;">
+            <div id="tab-rules" class="tab-content" style="display: none; flex: 1 1 0; overflow: auto; padding: 16px;">
                 <!-- Rules content goes here -->
                 <p>Rules tab content.</p>
                 <div id="rules-content"></div>
             </div>
-            <div id="tab-matching" class="tab-content" style="display: none; flex: 1 1 0; overflow: auto;">
+            <div id="tab-matching" class="tab-content" style="flex: 1 1 0; overflow: auto;">
                 <table id="data-table">
                     <thead class="sticky-table-header">
                         <tr>
                             <th id="th-name">Net</th>
                             <th id="th-delay">Delay (ps)</th>
+                            <th id="th-target-delay">Target (ps)</th>
                             <th id="th-diff">Difference (ps)</th>
                             <th id="th-top">Top (mm)</th>
                             <th id="th-in2">In2 (mm)</th>

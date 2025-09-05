@@ -16,6 +16,86 @@ function loadIndexPage() {
 
     const via_delay = 7.2 * 1.6048;  //TODO
 
+    let length_rules = {
+        'DDR3_DATA_A': { 'delay': 20.0, 'tolerance': 0.1, 'nets': [
+            "/iMX6 DDR RAM/DRAM_DATA00",
+            "/iMX6 DDR RAM/DRAM_DATA01",
+            "/iMX6 DDR RAM/DRAM_DATA02",
+            "/iMX6 DDR RAM/DRAM_DATA03",
+            "/iMX6 DDR RAM/DRAM_DATA04",
+            "/iMX6 DDR RAM/DRAM_DATA05",
+            "/iMX6 DDR RAM/DRAM_DATA06",
+            "/iMX6 DDR RAM/DRAM_DATA07",
+            "/iMX6 DDR RAM/DRAM_DQM0",
+            "/iMX6 DDR RAM/DRAM_SDQS0_P",
+            "/iMX6 DDR RAM/DRAM_SDQS0_N"
+            ]
+        },
+        'DDR3_DATA_B': { 'delay': 30.0, 'tolerance': 0.1, 'nets': [
+            "/iMX6 DDR RAM/DRAM_DATA08",
+            "/iMX6 DDR RAM/DRAM_DATA09",
+            "/iMX6 DDR RAM/DRAM_DATA10",
+            "/iMX6 DDR RAM/DRAM_DATA11",
+            "/iMX6 DDR RAM/DRAM_DATA12",
+            "/iMX6 DDR RAM/DRAM_DATA13",
+            "/iMX6 DDR RAM/DRAM_DATA14",
+            "/iMX6 DDR RAM/DRAM_DATA15",
+            "/iMX6 DDR RAM/DRAM_DQM1",
+            "/iMX6 DDR RAM/DRAM_SDQS1_P",
+            "/iMX6 DDR RAM/DRAM_SDQS1_N"
+            ]
+        },
+        'DDR3_ADDRESSS': { 'delay': 100.0, 'tolerance': 0.1, 'nets': [
+            "/iMX6 DDR RAM/DRAM_ADDR00",
+            "/iMX6 DDR RAM/DRAM_ADDR01",
+            "/iMX6 DDR RAM/DRAM_ADDR02",
+            "/iMX6 DDR RAM/DRAM_ADDR03",
+            "/iMX6 DDR RAM/DRAM_ADDR04",
+            "/iMX6 DDR RAM/DRAM_ADDR05",
+            "/iMX6 DDR RAM/DRAM_ADDR06",
+            "/iMX6 DDR RAM/DRAM_ADDR07",
+            "/iMX6 DDR RAM/DRAM_ADDR08",
+            "/iMX6 DDR RAM/DRAM_ADDR09",
+            "/iMX6 DDR RAM/DRAM_ADDR10",
+            "/iMX6 DDR RAM/DRAM_ADDR11",
+            "/iMX6 DDR RAM/DRAM_ADDR12",
+            "/iMX6 DDR RAM/DRAM_ADDR13",
+            "/iMX6 DDR RAM/DRAM_ADDR14",
+            "/iMX6 DDR RAM/DRAM_ADDR15",
+            "/iMX6 DDR RAM/DRAM_SDBA0",
+            "/iMX6 DDR RAM/DRAM_SDBA1",
+            "/iMX6 DDR RAM/DRAM_SDBA2"
+            ]
+        },
+        'DDR3_CONTROL': { 'delay': 50.0, 'tolerance': 0.1, 'nets': [
+            "/iMX6 DDR RAM/DRAM_CS0_B",
+            "/iMX6 DDR RAM/DRAM_CS1_B",
+            "/iMX6 DDR RAM/DRAM_CAS_B",
+            "/iMX6 DDR RAM/DRAM_RAS_B",
+            "/iMX6 DDR RAM/DRAM_SDWE_B",
+            "/iMX6 DDR RAM/DRAM_RESET",
+            "/iMX6 DDR RAM/DRAM_SDCKE0",
+            "/iMX6 DDR RAM/DRAM_SDCKE1",
+            "/iMX6 DDR RAM/DRAM_ODT0",
+            "/iMX6 DDR RAM/DRAM_ODT1"
+            ]
+        },
+        'DDR3_CLOCK': { 'delay': 180.0, 'tolerance': 0.1, 'nets': [
+            "/iMX6 DDR RAM/DRAM_SDCLK0_P",
+            "/iMX6 DDR RAM/DRAM_SDCLK0_N"
+            ]
+        }
+    };
+
+    function getNetRule(netName) {
+        for (const group of Object.values(length_rules)) {
+            if (group.nets.includes(netName)) {
+                return { delay: group.delay, tolerance: group.tolerance };
+            }
+        }
+        return null;
+    }
+
     async function fetchAndBuildRowsArr(filter) {
         let url = '/net_lengths';
         if (filter) {
@@ -49,11 +129,10 @@ function loadIndexPage() {
 
     // Calculate the delay difference vs the reference net
     function calculateDiffs(rowsArr) {
-        const referenceNet = document.getElementById('reference_net').value;
-        const referenceRow = rowsArr.find(row => row.name === referenceNet);
-        const referenceDelay = referenceRow ? referenceRow.delay : 0;
         rowsArr.forEach(row => {
-            row.diff = row.delay - referenceDelay;
+            const netRule = getNetRule(row.name);
+            row.target_delay = netRule?.delay || 0;
+            row.diff = row.delay - row.target_delay;
         });
     }
 
@@ -64,8 +143,6 @@ function loadIndexPage() {
             const filter = document.getElementById('filter').value;
             let rowsArr = await fetchAndBuildRowsArr(filter);
             calculateDiffs(rowsArr);
-
-            const maxTolerance = parseFloat(document.getElementById('max_tolerance').value);
 
             const selectedNetsResponse = await fetch('/selected_nets');
             if (!selectedNetsResponse.ok) throw new Error('Failed to fetch selected nets');
@@ -80,6 +157,8 @@ function loadIndexPage() {
                     return a.name.localeCompare(b.name) * sortDirection;
                 } else if (sortColumn === 'delay') {
                     return (a.delay - b.delay) * sortDirection;
+                } else if (sortColumn === 'target_delay') {
+                    return (a.target_delay - b.target_delay) * sortDirection;
                 } else if (sortColumn === 'diff') {
                     return (a.diff - b.diff) * sortDirection;
                 } else if (sortColumn === 'top') {
@@ -100,7 +179,8 @@ function loadIndexPage() {
             let rows = '';
             rowsArr.forEach(row => {
                 let diffBg = '';
-                if (row.diff !== null && Math.abs(row.diff) > maxTolerance) {
+                const rule = getNetRule(row.name);
+                if (row.diff !== null && Math.abs(row.diff) > (rule?.tolerance || 0)) {
                     diffBg = row.diff > 0 ? 'color: #d32f2f;' : 'color: orange;';
                 }
 
@@ -113,6 +193,7 @@ function loadIndexPage() {
                 rows += `<tr style="${rowBg}">
                     <td>${row.name}</td>
                     <td>${row.delay.toFixed(2)}</td>
+                    <td>${row.target_delay.toFixed(2)}</td>
                     <td style="${diffBg}">${row.diff.toFixed(2)}</td>
                     <td>${row.top.toFixed(2)}</td>
                     <td>${row.in2.toFixed(2)}</td>
@@ -237,6 +318,7 @@ function loadIndexPage() {
         const headerMap = {
             'th-name': 'name',
             'th-delay': 'delay',
+            'th-target-delay': 'target_delay',
             'th-diff': 'diff',
             'th-top': 'top',
             'th-in2': 'in2',
@@ -320,29 +402,12 @@ function loadIndexPage() {
             localStorage.setItem('filterValue', filterValue);
             updateTable();
         });
-
-        document.getElementById('reference_net').addEventListener('change', function () {
-            const referenceNet = document.getElementById('reference_net').value;
-            localStorage.setItem('referenceNet', referenceNet);
-            updateTable();
-        });
-
-        document.getElementById('max_tolerance').addEventListener('input', function () {
-            const maxTolerance = document.getElementById('max_tolerance').value;
-            localStorage.setItem('maxTolerance', maxTolerance);
-            updateTable();
-        });
     }
 
     window.addEventListener('DOMContentLoaded', function () {
         const savedFilter = localStorage.getItem('filterValue');
         if (savedFilter !== null) {
             document.getElementById('filter').value = savedFilter;
-        }
-
-        const savedMaxTolerance = localStorage.getItem('maxTolerance');
-        if (savedMaxTolerance !== null) {
-            document.getElementById('max_tolerance').value = savedMaxTolerance;
         }
 
         addSortingListeners();
