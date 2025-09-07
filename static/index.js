@@ -17,7 +17,7 @@ function loadIndexPage() {
     const via_delay = 7.2 * 1.6048;  //TODO
 
     let length_rules = {
-        'DDR3_DATA_A': { 'delay': 20.0, 'tolerance': 0.1, 'nets': [
+        'DDR3_DATA_A': { 'delay': 170.0, 'tolerance': 2, 'nets': [
             "/iMX6 DDR RAM/DRAM_DATA00",
             "/iMX6 DDR RAM/DRAM_DATA01",
             "/iMX6 DDR RAM/DRAM_DATA02",
@@ -31,7 +31,7 @@ function loadIndexPage() {
             "/iMX6 DDR RAM/DRAM_SDQS0_N"
             ]
         },
-        'DDR3_DATA_B': { 'delay': 30.0, 'tolerance': 0.1, 'nets': [
+        'DDR3_DATA_B': { 'delay': 190.0, 'tolerance': 2, 'nets': [
             "/iMX6 DDR RAM/DRAM_DATA08",
             "/iMX6 DDR RAM/DRAM_DATA09",
             "/iMX6 DDR RAM/DRAM_DATA10",
@@ -45,7 +45,7 @@ function loadIndexPage() {
             "/iMX6 DDR RAM/DRAM_SDQS1_N"
             ]
         },
-        'DDR3_ADDRESSS': { 'delay': 100.0, 'tolerance': 0.1, 'nets': [
+        'DDR3_ADDRESSS': { 'delay': 240.0, 'tolerance': 2, 'nets': [
             "/iMX6 DDR RAM/DRAM_ADDR00",
             "/iMX6 DDR RAM/DRAM_ADDR01",
             "/iMX6 DDR RAM/DRAM_ADDR02",
@@ -67,7 +67,7 @@ function loadIndexPage() {
             "/iMX6 DDR RAM/DRAM_SDBA2"
             ]
         },
-        'DDR3_CONTROL': { 'delay': 50.0, 'tolerance': 0.1, 'nets': [
+        'DDR3_CONTROL': { 'delay': 240.0, 'tolerance': 2, 'nets': [
             "/iMX6 DDR RAM/DRAM_CS0_B",
             "/iMX6 DDR RAM/DRAM_CS1_B",
             "/iMX6 DDR RAM/DRAM_CAS_B",
@@ -80,9 +80,51 @@ function loadIndexPage() {
             "/iMX6 DDR RAM/DRAM_ODT1"
             ]
         },
-        'DDR3_CLOCK': { 'delay': 180.0, 'tolerance': 0.1, 'nets': [
+        'DDR3_CLOCK': { 'delay': 240.0, 'tolerance': 2, 'nets': [
             "/iMX6 DDR RAM/DRAM_SDCLK0_P",
             "/iMX6 DDR RAM/DRAM_SDCLK0_N"
+            ]
+        },
+        'SDRAM': { 'delay': 120.0, 'tolerance': 25, 'nets': [
+            "/ECP5 SDRAM/SDRAM_ADDR00",
+            "/ECP5 SDRAM/SDRAM_ADDR01",
+            "/ECP5 SDRAM/SDRAM_ADDR02",
+            "/ECP5 SDRAM/SDRAM_ADDR03",
+            "/ECP5 SDRAM/SDRAM_ADDR04",
+            "/ECP5 SDRAM/SDRAM_ADDR05",
+            "/ECP5 SDRAM/SDRAM_ADDR06",
+            "/ECP5 SDRAM/SDRAM_ADDR07",
+            "/ECP5 SDRAM/SDRAM_ADDR08",
+            "/ECP5 SDRAM/SDRAM_ADDR09",
+            "/ECP5 SDRAM/SDRAM_ADDR10",
+            "/ECP5 SDRAM/SDRAM_ADDR11",
+            "/ECP5 SDRAM/SDRAM_ADDR12",
+            "/ECP5 SDRAM/SDRAM_DQ00",
+            "/ECP5 SDRAM/SDRAM_DQ01",
+            "/ECP5 SDRAM/SDRAM_DQ02",
+            "/ECP5 SDRAM/SDRAM_DQ03",
+            "/ECP5 SDRAM/SDRAM_DQ04",
+            "/ECP5 SDRAM/SDRAM_DQ05",
+            "/ECP5 SDRAM/SDRAM_DQ06",
+            "/ECP5 SDRAM/SDRAM_DQ07",
+            "/ECP5 SDRAM/SDRAM_DQ08",
+            "/ECP5 SDRAM/SDRAM_DQ09",
+            "/ECP5 SDRAM/SDRAM_DQ10",
+            "/ECP5 SDRAM/SDRAM_DQ11",
+            "/ECP5 SDRAM/SDRAM_DQ12",
+            "/ECP5 SDRAM/SDRAM_DQ13",
+            "/ECP5 SDRAM/SDRAM_DQ14",
+            "/ECP5 SDRAM/SDRAM_DQ15",
+            "/ECP5 SDRAM/SDRAM_WE",
+            "/ECP5 SDRAM/SDRAM_RAS",
+            "/ECP5 SDRAM/SDRAM_CS",
+            "/ECP5 SDRAM/SDRAM_CAS",
+            "/ECP5 SDRAM/SDRAM_UDQM",
+            "/ECP5 SDRAM/SDRAM_LDQM",
+            "/ECP5 SDRAM/SDRAM_CLK",
+            "/ECP5 SDRAM/SDRAM_CKE",
+            "/ECP5 SDRAM/SDRAM_BS1",
+            "/ECP5 SDRAM/SDRAM_BS0"
             ]
         }
     };
@@ -96,10 +138,10 @@ function loadIndexPage() {
         return null;
     }
 
-    async function fetchAndBuildRowsArr(filter) {
+    async function fetchAndBuildRowsArr(nets) {
         let url = '/net_lengths';
-        if (filter) {
-            url += '?filter=' + encodeURIComponent(filter);
+        if (nets && nets.length > 0) {
+            url += '?nets=' + encodeURIComponent(JSON.stringify(nets));
         }
         const response = await fetch(url);
         if (!response.ok) throw new Error('Network response was not ok');
@@ -136,12 +178,22 @@ function loadIndexPage() {
         });
     }
 
+    function getNetsByClass(netClass) { 
+        if (length_rules.hasOwnProperty(netClass)) {
+            return length_rules[netClass].nets;
+        }
+        // Return all nets from all classes if not found
+        return Object.values(length_rules).flatMap(rule => rule.nets);
+    }
+
     async function updateTable() {
         try {
             clearInterval(window.updateTableInterval);
 
-            const filter = document.getElementById('filter').value;
-            let rowsArr = await fetchAndBuildRowsArr(filter);
+            const netclassFilter = document.getElementById('netclass_filter').value;
+            const nets = getNetsByClass(netclassFilter);
+
+            let rowsArr = await fetchAndBuildRowsArr(nets);
             calculateDiffs(rowsArr);
 
             const selectedNetsResponse = await fetch('/selected_nets');
@@ -286,34 +338,6 @@ function loadIndexPage() {
         addRowHoverListeners();
     };
 
-    async function populateReferenceNetSelect() {
-        try {
-            const response = await fetch('/get_nets');
-            if (!response.ok) throw new Error('Failed to fetch nets');
-            const nets = await response.json(); // nets is now a list
-            const select = document.getElementById('reference_net');
-            select.innerHTML = '';
-            nets.forEach(net => {
-                const option = document.createElement('option');
-                option.value = net;
-                option.textContent = net;
-                select.appendChild(option);
-            });
-
-            const savedReferenceNet = localStorage.getItem('referenceNet');
-            if (savedReferenceNet !== null) {
-                document.getElementById('reference_net').value = savedReferenceNet;
-            }
-            // const targetNet = '/iMX6 DDR RAM/DRAM_SDCLK0_P';
-            // const targetOption = Array.from(select.options).find(opt => opt.value === targetNet);
-            // if (targetOption) {
-            //     select.value = targetNet;
-            // }
-        } catch (error) {
-            console.error('Error populating reference net select:', error);
-        }
-    }
-
     function addSortingListeners() {
         const headerMap = {
             'th-name': 'name',
@@ -404,6 +428,27 @@ function loadIndexPage() {
         });
     }
 
+    async function populateNetclassFilter() {
+        const select = document.getElementById('netclass_filter');
+        if (!select) return;
+        select.innerHTML = '';
+        // Add "None" option
+        const noneOption = document.createElement('option');
+        noneOption.value = '';
+        noneOption.textContent = '(None)';
+        select.appendChild(noneOption);
+        Object.keys(length_rules).forEach(key => {
+            const option = document.createElement('option');
+            option.value = key;
+            option.textContent = key;
+            select.appendChild(option);
+        });
+        // const savedNetclass = localStorage.getItem('netclassFilter');
+        // if (savedNetclass !== null) {
+        //     select.value = savedNetclass;
+        // }
+    }
+
     window.addEventListener('DOMContentLoaded', function () {
         const savedFilter = localStorage.getItem('filterValue');
         if (savedFilter !== null) {
@@ -416,7 +461,7 @@ function loadIndexPage() {
         document.getElementById('select-noncompliant').addEventListener('click', selectNoncompliantNets);
         document.getElementById('clear-selection').addEventListener('click', deselectAllNets);
 
-        populateReferenceNetSelect();
+        populateNetclassFilter();
         updateTable();
     });
 }

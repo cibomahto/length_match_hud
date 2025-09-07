@@ -44,12 +44,12 @@ class context:
 
         return thickness
 
-    def net_lengths(self, filter):
+    def net_lengths(self, net_names):
         nets = {}
         
         with self.board_lock:
             for net in self.board.get_nets():
-                if net.name.find(filter) != -1:
+                if net.name in net_names and net.name: # TODO whyo do we get a '' net?
                     nets[net.name] = {
                         'layer_lengths': {},
                         'vias': 0

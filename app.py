@@ -12,8 +12,8 @@ ctx = context()
 @app.route("/net_lengths", methods=["GET"])
 def get_lengths():
     try:
-        filter_param = request.args.get("filter")
-        data = ctx.net_lengths(filter_param)
+        nets = request.args.get("nets")
+        data = ctx.net_lengths(nets)
         return jsonify(data), 200
     except Exception as e:
         app.logger.error({"Error in /net_lengths": e})
